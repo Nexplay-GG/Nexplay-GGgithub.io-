@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>🦤 Struzzo del Deserto</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(180deg, #FF6B35 0%, #FF8C42 20%, #FFD166 60%, #F4A261 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fredoka One', cursive;
+    overflow: hidden;
+  }
+
+  h1 {
+    color: #fff;
+    font-size: 2.5rem;
+    text-shadow: 3px 3px 0 #c44d00, 6px 6px 0 rgba(0,0,0,0.2);
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+
+  #score-bar {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 12px;
+    color: #fff;
+    font-size: 1.3rem;
+    text-shadow: 2px 2px 0 #c44d00;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 900px;
+    max-width: 98vw;
+  }
+
+  #gameCanvas {
+    border-radius: 20px;
+    border: 4px solid rgba(255,255,255,0.5);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.3);
+    display: block;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  #overlay h2 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2.8rem;
+    color: #FFD166;
+    text-shadow: 3px 3px 0 #c44d00;
+    margin-bottom: 12px;
+  }
+
+  #overlay p {
+    font-family: 'Nunito', sans-serif;
+    font-size: 1.2rem;
+    color: #fff;
+    margin-bottom: 24px;
+  }
+
+  #startBtn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.5rem;
+    padding: 14px 40px;
+    background: linear-gradient(135deg, #FFD166, #FF8C42);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #c44d00, 0 10px 20px rgba(0,0,0,0.3);
+    transition: all 0.1s;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+  }
+
+  #startBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #c44d00; }
+  #startBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c44d00; }
+
+  #hint {
+    margin-top: 10px;
+    font-family: 'Nunito', sans-serif;
+    color: rgba(255,255,255,0.8);
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>🦤 Struzzo del Deserto</h1>
+<div id="score-bar">
+  <span>⭐ Punteggio: <span id="score">0</span></span>
+  <span>🏆 Record: <span id="best">0</span></span>
+</div>
+
+<div id="game-wrapper">
+  <canvas id="gameCanvas" width="900" height="320"></canvas>
+  <div id="overlay">
+    <h2>🦤 Struzzo Runner!</h2>
+    <p>Salta i cactus del deserto!</p>
+    <button id="startBtn">▶ Inizia</button>
+    <p id="hint">Spazio / Click / Touch per saltare</p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const overlayTitle = overlay.querySelector('h2');
+const overlayDesc = overlay.querySelector('p');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+
+const W = canvas.width, H = canvas.height;
+const GROUND = H - 60;
+
+// ---- FACES ----
+const faces = [
+  // Happy family
+  "😀","😃","😄","😁","😆","😅","🤣","😂","😊","😇",
+  // Cool
+  "😎","🤓","🧐","😏","😒","🙄","😑","😐","😶","🫥",
+  // Silly
+  "😜","😝","😛","🤪","🤑","🤗","🤭","🫢","🫣","🤫",
+  // Surprised
+  "😮","😯","😲","🤯","😳","🥺","🥹","😦","😧","😨",
+  // Sad/Angry
+  "😢","😭","😤","😠","😡","🤬","😈","👿","💀","☠️",
+  // Sick/Weird
+  "🤢","🤮","🤧","😷","🤒","🤕","🥴","😵","🤐","😬",
+  // Love
+  "😍","🥰","😘","😗","😙","😚","💋","🥲","😻","💘",
+  // Animals as faces
+  "🐸","🐼","🐨","🦊","🐯","🦁","🐮","🐷","🐸","🐵",
+  // Food faces
+  "😋","🍕","🧁","🍩","🎃","👻","💩","🤡","👾","🎭",
+  // Extra wild
+  "🫠","🥶","🥵","🤠","🥸","🧟","🧛","🧜","🧝","🫡",
+  "😴","😪","🥱","😌","😔","😟","😕","🙁","☹️","😣",
+  // Symbols as faces
+  "🌝","🌚","🌞","🌛","🌜","🌟","⭐","🌈","🔥","💫"
+];
+
+// ---- PALETTE ----
+const SKY_TOP = '#FF6B35', SKY_MID = '#FFD166', SKY_BOT = '#F4A261';
+const GROUND_COL = '#E8936A', SAND_COL = '#F4C77B', DUNE_COL = '#E8A96A';
+const SUN_COL = '#FFE566';
+
+// ---- GAME STATE ----
+let state = 'idle'; // idle | playing | dead
+let score = 0, best = 0, frame = 0;
+let speed = 6, speedInc = 0.003;
+
+// ---- OSTRICH ----
+const ostrich = {
+  x: 110, y: GROUND, w: 60, h: 80,
+  vy: 0, onGround: true,
+  legPhase: 0,
+  jump() {
+    if (this.onGround) {
+      this.vy = -18;
+      this.onGround = false;
+    }
+  },
+  update() {
+    if (!this.onGround) {
+      this.vy += 0.9;
+      this.y += this.vy;
+      if (this.y >= GROUND) { this.y = GROUND; this.vy = 0; this.onGround = true; }
+    }
+    if (this.onGround) this.legPhase += 0.35;
+  },
+  draw() {
+    const bx = this.x, by = this.y;
+    ctx.save();
+
+    // Shadow
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(bx + 10, GROUND + 8, 30, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Legs
+    const legSwing = Math.sin(this.legPhase) * 12;
+    // Left leg
+    ctx.strokeStyle = '#C47B3A';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx + 20, by - 10);
+    ctx.lineTo(bx + 14 + legSwing, by + 5);
+    ctx.lineTo(bx + 6 + legSwing, by + 10);
+    ctx.stroke();
+    // Right leg
+    ctx.beginPath();
+    ctx.moveTo(bx + 28, by - 10);
+    ctx.lineTo(bx + 34 - legSwing, by + 5);
+    ctx.lineTo(bx + 42 - legSwing, by + 10);
+    ctx.stroke();
+
+    // Body
+    ctx.fillStyle = '#8B5E3C';
+    ctx.beginPath();
+    ctx.ellipse(bx + 24, by - 30, 22, 28, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Feather tufts (butt)
+    const featherColors = ['#C0392B','#E67E22','#F1C40F','#27AE60','#2980B9','#8E44AD'];
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = featherColors[i % featherColors.length];
+      ctx.beginPath();
+      const fx = bx + 3 + i * 5;
+      const fy = by - 55 - Math.sin(frame * 0.1 + i) * 4;
+      ctx.ellipse(fx, fy, 5, 9, -0.3 + i * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Neck
+    ctx.strokeStyle = '#D4A56A';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx + 30, by - 50);
+    ctx.quadraticCurveTo(bx + 48, by - 72, bx + 44, by - 85);
+    ctx.stroke();
+    // Neck outline
+    ctx.strokeStyle = '#C47B3A';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Head
+    ctx.fillStyle = '#D4A56A';
+    ctx.beginPath();
+    ctx.ellipse(bx + 44, by - 90, 12, 10, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#C47B3A';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(bx + 50, by - 93, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(bx + 51, by - 93, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyeshine
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(bx + 52, by - 94, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak
+    ctx.fillStyle = '#E8A050';
+    ctx.beginPath();
+    ctx.moveTo(bx + 54, by - 93);
+    ctx.lineTo(bx + 64, by - 90);
+    ctx.lineTo(bx + 54, by - 88);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  },
+  getHitbox() {
+    return { x: this.x + 8, y: this.y - this.h + 15, w: 50, h: this.h - 15 };
+  }
+};
+
+// ---- OBSTACLES ----
+let obstacles = [];
+let nextObstacleIn = 80;
+
+function randomFace() { return faces[Math.floor(Math.random() * faces.length)]; }
+
+function spawnObstacle() {
+  const types = [1, 1, 1, 2, 3]; // weights
+  const type = types[Math.floor(Math.random() * types.length)];
+  const h = 40 + Math.random() * 50;
+  const w = 32 + Math.random() * 28;
+  const faceCount = type === 3 ? 3 : type === 2 ? 2 : 1;
+  const facesArr = Array.from({length: faceCount}, randomFace);
+  obstacles.push({ x: W + 30, y: GROUND - h, w, h, type, faces: facesArr, wobble: Math.random() * Math.PI * 2 });
+}
+
+function drawCactus(ob) {
+  const {x, y, w, h, type, faces: fArr, wobble} = ob;
+  const cx = x + w / 2;
+  const wobbleAmt = Math.sin(frame * 0.05 + wobble) * 2;
+
+  ctx.save();
+
+  // Main trunk
+  const gradient = ctx.createLinearGradient(x, y, x + w, y);
+  gradient.addColorStop(0, '#4CAF50');
+  gradient.addColorStop(0.4, '#66BB6A');
+  gradient.addColorStop(1, '#388E3C');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  roundRect(ctx, x + w*0.25, y, w*0.5, h, 10);
+  ctx.fill();
+
+  // Trunk border
+  ctx.strokeStyle = '#2E7D32';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  roundRect(ctx, x + w*0.25, y, w*0.5, h, 10);
+  ctx.stroke();
+
+  // Spines on trunk
+  ctx.strokeStyle = '#1B5E20';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 5; i++) {
+    const sy = y + (h * 0.15) + i * (h * 0.16);
+    ctx.beginPath(); ctx.moveTo(x + w*0.25, sy); ctx.lineTo(x + w*0.1, sy - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + w*0.75, sy); ctx.lineTo(x + w*0.9, sy - 6); ctx.stroke();
+  }
+
+  if (type >= 2) {
+    // Left arm
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    roundRect(ctx, x, y + h*0.25 + wobbleAmt, w*0.3, w*0.45, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#2E7D32'; ctx.lineWidth = 2;
+    ctx.beginPath(); roundRect(ctx, x, y + h*0.25 + wobbleAmt, w*0.3, w*0.45, 8); ctx.stroke();
+    // Arm top connector
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    roundRect(ctx, x + w*0.25, y + h*0.25 + wobbleAmt, w*0.25, w*0.2, 6);
+    ctx.fill();
+  }
+
+  if (type >= 3) {
+    // Right arm
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    roundRect(ctx, x + w*0.7, y + h*0.15 - wobbleAmt, w*0.3, w*0.45, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#2E7D32'; ctx.lineWidth = 2;
+    ctx.beginPath(); roundRect(ctx, x + w*0.7, y + h*0.15 - wobbleAmt, w*0.3, w*0.45, 8); ctx.stroke();
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    roundRect(ctx, x + w*0.5, y + h*0.15 - wobbleAmt, w*0.25, w*0.2, 6);
+    ctx.fill();
+  }
+
+  // Faces on cactus
+  ctx.font = `${Math.min(w * 0.6, 26)}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (fArr.length === 1) {
+    ctx.fillText(fArr[0], cx, y + h * 0.45);
+  } else if (fArr.length === 2) {
+    ctx.fillText(fArr[0], cx, y + h * 0.3);
+    ctx.fillText(fArr[1], cx, y + h * 0.65);
+  } else {
+    ctx.fillText(fArr[0], cx, y + h * 0.22);
+    ctx.fillText(fArr[1], cx, y + h * 0.5);
+    ctx.fillText(fArr[2], cx, y + h * 0.78);
+  }
+
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+// ---- BACKGROUND ELEMENTS ----
+let bgX = 0;
+const stars = Array.from({length: 8}, () => ({
+  x: Math.random() * W, y: Math.random() * (GROUND * 0.5),
+  emoji: ['🌵','🏜️','⭐','🌟','✨'][Math.floor(Math.random() * 5)],
+  size: 16 + Math.random() * 20, speed: 0.3 + Math.random() * 0.4
+}));
+
+// Dunes
+const dunes = Array.from({length: 5}, (_, i) => ({
+  x: i * 220, y: GROUND - 30, r: 120 + Math.random() * 80
+}));
+
+function drawBackground() {
+  // Sky gradient
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND);
+  skyGrad.addColorStop(0, '#FF6B35');
+  skyGrad.addColorStop(0.5, '#FFD166');
+  skyGrad.addColorStop(1, '#F4A261');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Sun
+  ctx.save();
+  ctx.fillStyle = SUN_COL;
+  ctx.shadowColor = '#FFE566';
+  ctx.shadowBlur = 30;
+  ctx.beginPath();
+  ctx.arc(W - 120, 70, 45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Sun rays
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,229,102,0.4)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 8; i++) {
+    const angle = (frame * 0.005) + i * Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(W - 120 + Math.cos(angle) * 52, 70 + Math.sin(angle) * 52);
+    ctx.lineTo(W - 120 + Math.cos(angle) * 75, 70 + Math.sin(angle) * 75);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Floating emojis in sky
+  ctx.save();
+  stars.forEach(s => {
+    ctx.font = `${s.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.7;
+    const sx = ((s.x - bgX * s.speed) % (W + 60) + W + 60) % (W + 60) - 30;
+    ctx.fillText(s.emoji, sx, s.y);
+  });
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // Dunes
+  ctx.fillStyle = DUNE_COL;
+  dunes.forEach(d => {
+    const dx = ((d.x - bgX * 1.5) % (W + 300) + W + 300) % (W + 300) - 150;
+    ctx.beginPath();
+    ctx.arc(dx, d.y, d.r, Math.PI, 0);
+    ctx.fill();
+  });
+
+  // Ground
+  const groundGrad = ctx.createLinearGradient(0, GROUND, 0, H);
+  groundGrad.addColorStop(0, SAND_COL);
+  groundGrad.addColorStop(1, GROUND_COL);
+  ctx.fillStyle = groundGrad;
+  ctx.fillRect(0, GROUND, W, H - GROUND);
+
+  // Ground line
+  ctx.strokeStyle = '#D4895A';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND + 2);
+  ctx.lineTo(W, GROUND + 2);
+  ctx.stroke();
+
+  // Pebbles
+  ctx.fillStyle = '#C47B4A';
+  for (let i = 0; i < 12; i++) {
+    const px = ((i * 80 - bgX * 6) % (W + 40) + W + 40) % (W + 40) - 20;
+    const py = GROUND + 8 + (i % 3) * 8;
+    ctx.beginPath();
+    ctx.ellipse(px, py, 5, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Small plants
+  ctx.font = '18px serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 6; i++) {
+    const px = ((i * 160 - bgX * 5) % (W + 80) + W + 80) % (W + 80) - 40;
+    ctx.fillText('🌱', px, GROUND - 4);
+  }
+}
+
+// ---- COLLISION ----
+function checkCollision() {
+  const h = ostrich.getHitbox();
+  for (const ob of obstacles) {
+    const hitbox = { x: ob.x + ob.w*0.3, y: ob.y, w: ob.w*0.4, h: ob.h };
+    if (h.x < hitbox.x + hitbox.w && h.x + h.w > hitbox.x &&
+        h.y < hitbox.y + hitbox.h && h.y + h.h > hitbox.y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ---- PARTICLES ----
+let particles = [];
+function spawnParticles(x, y) {
+  for (let i = 0; i < 18; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 2 + Math.random() * 5;
+    particles.push({
+      x, y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd - 3,
+      life: 1, emoji: ['💥','⭐','🌟','✨','💫','🔥'][Math.floor(Math.random() * 6)],
+      size: 16 + Math.random() * 16
+    });
+  }
+}
+
+// ---- SCORE POPUP ----
+let popups = [];
+function addPopup(x, y, text) {
+  popups.push({ x, y, text, life: 1, vy: -2 });
+}
+
+// ---- MAIN LOOP ----
+function update() {
+  if (state !== 'playing') return;
+
+  frame++;
+  bgX += speed * 0.5;
+  score++;
+  speed += speedInc;
+  scoreEl.textContent = Math.floor(score / 6);
+
+  // Milestones
+  if (score % 300 === 0) addPopup(W/2, H/2, '🎉 +VELOCITÀ!');
+
+  ostrich.update();
+
+  // Obstacles
+  nextObstacleIn--;
+  if (nextObstacleIn <= 0) {
+    spawnObstacle();
+    nextObstacleIn = Math.max(40, 100 - score / 300) + Math.random() * 60;
+  }
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    obstacles[i].x -= speed;
+    if (obstacles[i].x + obstacles[i].w < -60) {
+      obstacles.splice(i, 1);
+      addPopup(200, GROUND - 40, '+' + Math.floor(speed));
+    }
+  }
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.04;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Popups
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.y += p.vy; p.life -= 0.025;
+    if (p.life <= 0) popups.splice(i, 1);
+  }
+
+  if (checkCollision()) {
+    state = 'dead';
+    const sc = Math.floor(score / 6);
+    if (sc > best) { best = sc; bestEl.textContent = best; }
+    spawnParticles(ostrich.x + 30, ostrich.y - 40);
+    overlayTitle.textContent = '💀 Struzzo K.O.!';
+    overlayDesc.textContent = `Punteggio: ${sc} | Record: ${best}`;
+    startBtn.textContent = '🔄 Rigioca';
+    overlay.style.display = 'flex';
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+
+  obstacles.forEach(drawCactus);
+  ostrich.draw();
+
+  // Particles
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.font = `${p.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.emoji, p.x, p.y);
+    ctx.restore();
+  });
+
+  // Popups
+  popups.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.font = 'bold 22px Fredoka One, cursive';
+    ctx.fillStyle = '#FFD166';
+    ctx.strokeStyle = '#c44d00';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.restore();
+  });
+
+  // Speed indicator
+  ctx.save();
+  ctx.font = '14px Nunito, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.textAlign = 'right';
+  ctx.fillText(`🏎️ ${speed.toFixed(1)}x`, W - 12, 22);
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  state = 'playing';
+  score = 0; frame = 0; speed = 6; speedInc = 0.003;
+  obstacles = []; particles = []; popups = [];
+  ostrich.y = GROUND; ostrich.vy = 0; ostrich.onGround = true; ostrich.legPhase = 0;
+  nextObstacleIn = 80;
+  scoreEl.textContent = '0';
+  overlay.style.display = 'none';
+}
+
+// Controls
+function jump() {
+  if (state === 'idle' || state === 'dead') { startGame(); return; }
+  if (state === 'playing') ostrich.jump();
+}
+
+startBtn.addEventListener('click', e => { e.stopPropagation(); startGame(); });
+document.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); } });
+canvas.addEventListener('click', jump);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+
+loop();
+</script>
+</body>
+</html>
