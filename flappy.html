@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -239,97 +240,164 @@ canvas {
     ctx.globalAlpha = 1;
   }
 
-  /* ── CORPO COLONNA ── */
-  function drawPipeBody(x, y, w, h, wb) {
-    var gr = ctx.createLinearGradient(x, 0, x + w, 0);
-    gr.addColorStop(0,    '#1e0840');
-    gr.addColorStop(0.3,  '#4c1d95');
-    gr.addColorStop(0.65, '#7c3aed');
-    gr.addColorStop(1,    '#3b0764');
-    ctx.fillStyle = gr;
-    roundRect(x, y, w, h, 12);
-    ctx.fill();
+  /* ── GIRASOLE con faccina emoji ── */
+  function drawSunflower(cx, cy, faceEmoji, upside, wb) {
+    var petals  = 16;
+    var petalLen = 19;
+    var petalW   = 6;
+    var coreR    = 19;
+    var wobbleX  = wb > 0.05 ? Math.sin(frame * 1.4) * wb * 6 : 0;
+    var sway     = Math.sin(frame * 0.04 + cy * 0.01) * 0.07;
 
-    /* strisce */
     ctx.save();
-    roundRect(x, y, w, h, 12); ctx.clip();
-    ctx.strokeStyle = 'rgba(167,139,250,0.18)';
-    ctx.lineWidth = 1;
-    for (var li = y + 10; li < y + h - 10; li += 14) {
-      ctx.beginPath(); ctx.moveTo(x + 10, li); ctx.lineTo(x + w - 10, li); ctx.stroke();
+    ctx.translate(cx + wobbleX, cy);
+    ctx.rotate(sway);
+
+    /* corona petali esterni (layer dietro) */
+    for (var pi2 = 0; pi2 < petals; pi2++) {
+      var ang = (pi2 / petals) * Math.PI * 2 + (upside ? Math.PI : 0);
+      ctx.save();
+      ctx.rotate(ang);
+      ctx.translate(0, -(coreR + petalLen * 0.38));
+      ctx.fillStyle = pi2 % 2 === 0 ? '#FFD700' : '#FFC200';
+      ctx.shadowColor = wb > 0.05 ? '#ff6bbd' : 'rgba(255,200,0,0.5)';
+      ctx.shadowBlur  = wb > 0.05 ? 16 : 7;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, petalW, petalLen, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b37700';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
     }
+
+    /* corona petali interni (layer davanti, offset 0.5) */
+    for (var pi3 = 0; pi3 < petals; pi3++) {
+      var ang2 = ((pi3 + 0.5) / petals) * Math.PI * 2 + (upside ? Math.PI : 0);
+      ctx.save();
+      ctx.rotate(ang2);
+      ctx.translate(0, -(coreR + petalLen * 0.22));
+      ctx.fillStyle = '#FFA500';
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, petalW * 0.7, petalLen * 0.65, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.shadowBlur = 0;
+
+    /* disco esterno (bordo marrone) */
+    ctx.fillStyle = '#6B3A1F';
+    ctx.shadowColor = wb > 0.05 ? '#ff6bbd' : 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur  = wb > 0.05 ? 22 : 10;
+    ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    /* disco interno scuro */
+    ctx.fillStyle = '#2e1205';
+    ctx.beginPath(); ctx.arc(0, 0, coreR - 6, 0, Math.PI * 2); ctx.fill();
+
+    /* semini a spirale */
+    ctx.fillStyle = '#7a4a18';
+    for (var di = 0; di < 16; di++) {
+      var da = (di / 16) * Math.PI * 2;
+      var dr = coreR * 0.52;
+      ctx.beginPath();
+      ctx.arc(Math.cos(da) * dr, Math.sin(da) * dr, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#5c3310';
+    for (var di2 = 0; di2 < 8; di2++) {
+      var da2 = (di2 / 8) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(da2) * coreR * 0.26, Math.sin(da2) * coreR * 0.26, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    /* faccina emoji — grande, leggibile */
+    ctx.save();
+    if (upside) ctx.rotate(Math.PI);
+    ctx.font = '17px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 5;
+    ctx.fillText(faceEmoji, 0, 0);
+    ctx.shadowBlur = 0;
     ctx.restore();
 
-    /* bordo */
-    if (wb > 0.05) {
-      ctx.strokeStyle = 'rgba(255,107,189,' + (wb * 0.9) + ')';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#ff6bbd';
-      ctx.shadowBlur = 18;
-    } else {
-      ctx.strokeStyle = '#a78bfa';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#a855f7';
-      ctx.shadowBlur = 8;
-    }
-    roundRect(x, y, w, h, 12); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ── STELO ── */
+  function drawStem(cx, fromY, toY, wb) {
+    var wobbleX = wb > 0.05 ? Math.sin(frame * 1.4) * wb * 6 : 0;
+    var sway    = Math.sin(frame * 0.04 + fromY * 0.01) * 10;
+    var midX    = cx + wobbleX + sway;
+    var midY    = (fromY + toY) / 2;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    /* ombra stelo */
+    ctx.strokeStyle = '#1a3d10';
+    ctx.lineWidth = 33;
     ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(cx + wobbleX + 3, fromY);
+    ctx.quadraticCurveTo(midX + 3, midY, cx + wobbleX + 3, toY);
+    ctx.stroke();
+
+    /* stelo principale */
+    ctx.strokeStyle = '#3a8a28';
+    ctx.lineWidth = 30;
+    ctx.shadowColor = wb > 0.05 ? '#ff6bbd' : 'rgba(0,100,0,0.25)';
+    ctx.shadowBlur  = wb > 0.05 ? 12 : 4;
+    ctx.beginPath();
+    ctx.moveTo(cx + wobbleX, fromY);
+    ctx.quadraticCurveTo(midX, midY, cx + wobbleX, toY);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    /* vena centrale chiara */
+    ctx.strokeStyle = 'rgba(120,210,80,0.35)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + wobbleX, fromY);
+    ctx.quadraticCurveTo(midX, midY, cx + wobbleX, toY);
+    ctx.stroke();
+
+    /* foglia dx */
+    ctx.fillStyle = '#4aaa32';
+    ctx.save();
+    ctx.translate(cx + wobbleX, midY - 18);
+    ctx.rotate(0.6);
+    ctx.beginPath(); ctx.ellipse(18, 0, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2d6a1f'; ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    /* foglia sx */
+    ctx.save();
+    ctx.translate(cx + wobbleX, midY + 18);
+    ctx.rotate(-0.6);
+    ctx.beginPath(); ctx.ellipse(-18, 0, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2d6a1f'; ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   }
 
-  /* ── CAPPUCCIO COLONNA ── */
-  function drawPipeCap(x, cy, w) {
-    var cg = ctx.createLinearGradient(0, cy - 9, 0, cy + 9);
-    cg.addColorStop(0, '#e9d5ff');
-    cg.addColorStop(0.4, '#c084fc');
-    cg.addColorStop(1, '#7c3aed');
-    ctx.fillStyle = cg;
-    roundRect(x - 5, cy - 9, w + 10, 18, 7); ctx.fill();
-    ctx.strokeStyle = '#f5d0fe'; ctx.lineWidth = 1.2;
-    roundRect(x - 5, cy - 9, w + 10, 18, 7); ctx.stroke();
-  }
-
-  /* ── COLONNA COMPLETA ── */
+  /* ── OSTACOLO GIRASOLE COMPLETO ── */
   function drawPipe(p) {
     var wb = p.wobble;
-    var sx = (wb > 0.02) ? Math.sin(frame * 1.1) * wb * 7 : 0;
-
-    ctx.save();
-    ctx.translate(sx, 0);
-
-    /* superiore */
-    drawPipeBody(p.x, 0, PW, p.topH, wb);
-    drawPipeCap(p.x, p.topH, PW);
-
-    /* emoji superiore — capovolta */
-    ctx.save();
-    ctx.translate(p.x + PW / 2, p.topH - 40);
-    ctx.rotate(Math.PI);
-    ctx.font = '36px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 12;
-    ctx.fillText(p.e1, 0, 0);
-    ctx.shadowBlur = 0;
-    ctx.restore();
-
-    /* inferiore */
-    drawPipeBody(p.x, p.botY, PW, p.botH, wb);
-    drawPipeCap(p.x, p.botY, PW);
-
-    /* emoji inferiore — dritta */
-    ctx.save();
-    ctx.translate(p.x + PW / 2, p.botY + 40);
-    ctx.font = '36px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 12;
-    ctx.fillText(p.e2, 0, 0);
-    ctx.shadowBlur = 0;
-    ctx.restore();
-
-    ctx.restore();
+    var cx = p.x + PW / 2;
+    var flowerR = 19;
+    drawStem(cx, 0, p.topH - flowerR, wb);
+    drawSunflower(cx, p.topH - flowerR, p.e1, true, wb);
+    drawStem(cx, p.botY + flowerR, H, wb);
+    drawSunflower(cx, p.botY + flowerR, p.e2, false, wb);
   }
 
   /* ── COCCINELLA ── */
@@ -644,4 +712,3 @@ canvas {
 </script>
 </body>
 </html>
-
